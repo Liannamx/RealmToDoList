@@ -14,21 +14,18 @@ class TasksViewController: UITableViewController {
 
     var currentTasks: Results<Task>!
     var completedTasks: Results<Task>!
+    
+    private var isEditingMode = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
         title = currentTasksList.name
         filteringTasks()
-
-        // Uncomment the following line to preserve selection between presentations
-        // self.clearsSelectionOnViewWillAppear = false
-
-        // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        // self.navigationItem.rightBarButtonItem = self.editButtonItem
     }
 
     @IBAction func editButtonPressed(_ sender: Any) {
+        isEditingMode.toggle() // Переключает значение булевой переменной
+        tableView.setEditing(isEditingMode, animated: true)
     }
 
     @IBAction func addButtonPressed(_ sender: Any) {
@@ -68,31 +65,73 @@ class TasksViewController: UITableViewController {
 
         return cell
     }
+
+
+    // MARK: - Table view delegate
+
+    override func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? /* для свайпа  */ {
+        
+        let task = indexPath.section == 0 ? currentTasks[indexPath.row] : completedTasks[indexPath.row]
+        
+        let deleteContextItem = UIContextualAction(style: .destructive, title: "Delete") { (_, _, _) in
+            StorageManager.deleteTask(task)
+            self.filteringTasks()
+        }
+        
+        let editContextItem = UIContextualAction(style: .destructive, title: "Edit") { (_, _, _) in
+            self.alertForAddAndUpdateList()
+        }
+
+        let doneContextItem = UIContextualAction(style: .destructive, title: "Edit") { (_, _, _) in
+            StorageManager.makeDone(task)
+            self.filteringTasks()
+        }
+        
+        editContextItem.backgroundColor = .orange
+        doneContextItem.backgroundColor = #colorLiteral(red: 0.3411764801, green: 0.6235294342, blue: 0.1686274558, alpha: 1)
+        
+        let swipeActions = UISwipeActionsConfiguration(actions: [deleteContextItem,editContextItem,doneContextItem])
+        
+        return swipeActions
+    }
 }
 
 extension TasksViewController {
 
-    private func alertForAddAndUpdateList() {
+    private func alertForAddAndUpdateList(_ taskName: Task? = nil) {
         
-        let title = "New Task"
-        let doneButton = "Save"
+        var title = "New Task"
+        let messege = "Please insert task value"
+        var doneButton = "Save"
+        
+        if taskName != nil {
+            title = "Edit task"
+            doneButton = "Update"
+        }
 
-        let alert = UIAlertController(title: title, message: "Please insert task value", preferredStyle: .alert)
+        let alert = UIAlertController(title: title, message: messege, preferredStyle: .alert)
         var taskTextField: UITextField!
         var noteTextField: UITextField!
 
         let saveAction = UIAlertAction(title: doneButton, style: .default) { _ in
             guard let newTask = taskTextField.text , !newTask.isEmpty else { return }
             
+            if let taskName = taskName {
+                if let newNote = noteTextField.text, !newNote.isEmpty {
+                    StorageManager.editTask(taskName, newTask: newTask, newNote: newNote)
+                } else {
+                    StorageManager.editTask(taskName, newTask: newTask, newNote: "")
+                }
+                self.filteringTasks()
+            } else {
                 let task = Task()
                 task.name = newTask
-                
                 if let note = noteTextField.text, !note.isEmpty {
                     task.note = note
                 }
-                
                 StorageManager.saveTask(self.currentTasksList, task: task)
                 self.filteringTasks()
+            }
         }
 
         let cancelAction = UIAlertAction(title: "Cancel", style: .destructive)
